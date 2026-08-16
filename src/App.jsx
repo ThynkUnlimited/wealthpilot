@@ -1,4 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom"
 
 import Dashboard from "./pages/Dashboard"
 import Transactions from "./pages/Transactions"
@@ -6,6 +11,8 @@ import ActivityCentre from "./pages/ActivityCentre"
 import Expenses from "./pages/Expenses"
 import Income from "./pages/Income"
 import Budget from "./pages/Budget"
+import Assets from "./pages/Assets"
+import Liabilities from "./pages/Liabilities"
 import Savings from "./pages/Savings"
 import WealthVault from "./pages/WealthVault"
 import Planner from "./pages/Planner"
@@ -15,8 +22,10 @@ import Settings from "./pages/Settings"
 
 import Login from "./pages/Login"
 import Register from "./pages/Register"
+import ForgotPassword from "./pages/ForgotPassword"
 
 import ProtectedRoute from "./components/ProtectedRoute"
+
 
 export default function App() {
 
@@ -26,7 +35,19 @@ export default function App() {
 
       <Routes>
 
-        {/* Authentication */}
+        {/* ==========================
+            PUBLIC ROUTES
+        ========================== */}
+
+        <Route
+          path="/"
+          element={
+            <Navigate
+              to="/login"
+              replace
+            />
+          }
+        />
 
         <Route
           path="/login"
@@ -38,14 +59,15 @@ export default function App() {
           element={<Register />}
         />
 
-        {/* Default */}
-
         <Route
-          path="/"
-          element={<Navigate to="/dashboard" replace />}
+          path="/forgot-password"
+          element={<ForgotPassword />}
         />
 
-        {/* Dashboard */}
+
+        {/* ==========================
+            PROTECTED ROUTES
+        ========================== */}
 
         <Route
           path="/dashboard"
@@ -56,7 +78,6 @@ export default function App() {
           }
         />
 
-        {/* Transactions */}
 
         <Route
           path="/transactions"
@@ -67,7 +88,6 @@ export default function App() {
           }
         />
 
-        {/* Activity Centre */}
 
         <Route
           path="/activity"
@@ -78,7 +98,6 @@ export default function App() {
           }
         />
 
-        {/* Expenses */}
 
         <Route
           path="/expenses"
@@ -89,7 +108,6 @@ export default function App() {
           }
         />
 
-        {/* Income */}
 
         <Route
           path="/income"
@@ -100,7 +118,6 @@ export default function App() {
           }
         />
 
-        {/* Budget */}
 
         <Route
           path="/budget"
@@ -111,7 +128,34 @@ export default function App() {
           }
         />
 
-        {/* Savings */}
+
+        {/* ==========================
+            ASSETS
+        ========================== */}
+
+        <Route
+          path="/assets"
+          element={
+            <ProtectedRoute>
+              <Assets />
+            </ProtectedRoute>
+          }
+        />
+
+
+        {/* ==========================
+            LIABILITIES
+        ========================== */}
+
+        <Route
+          path="/liabilities"
+          element={
+            <ProtectedRoute>
+              <Liabilities />
+            </ProtectedRoute>
+          }
+        />
+
 
         <Route
           path="/savings"
@@ -122,7 +166,6 @@ export default function App() {
           }
         />
 
-        {/* Wealth Vault */}
 
         <Route
           path="/wealth-vault"
@@ -133,7 +176,6 @@ export default function App() {
           }
         />
 
-        {/* Financial Planner */}
 
         <Route
           path="/planner"
@@ -144,7 +186,6 @@ export default function App() {
           }
         />
 
-        {/* Analytics */}
 
         <Route
           path="/analytics"
@@ -155,7 +196,6 @@ export default function App() {
           }
         />
 
-        {/* Reports */}
 
         <Route
           path="/reports"
@@ -166,7 +206,6 @@ export default function App() {
           }
         />
 
-        {/* Settings */}
 
         <Route
           path="/settings"
@@ -177,11 +216,19 @@ export default function App() {
           }
         />
 
-        {/* Catch All */}
+
+        {/* ==========================
+            UNKNOWN ROUTES
+        ========================== */}
 
         <Route
           path="*"
-          element={<Navigate to="/" replace />}
+          element={
+            <Navigate
+              to="/login"
+              replace
+            />
+          }
         />
 
       </Routes>

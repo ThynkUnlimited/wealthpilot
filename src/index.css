@@ -1,13 +1,61 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode */
+@custom-variant dark (&:where(.dark, .dark *));
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+html {
+
+  transition: background-color .25s ease,
+              color .25s ease;
+
+}
+
 body {
+
   background: #f8fafc;
+
   color: #0f172a;
+
   font-family: Inter, Arial, sans-serif;
+
+  transition:
+    background-color .25s ease,
+    color .25s ease;
+
+}
+
+/* Scrollbar */
+
+::-webkit-scrollbar {
+
+  width: 10px;
+
+}
+
+::-webkit-scrollbar-thumb {
+
+  background: #94a3b8;
+
+  border-radius: 10px;
+
+}
+
+.dark body {
+
+  background: #020617;
+
+  color: #f8fafc;
+
+}
+
+.dark ::-webkit-scrollbar-thumb {
+
+  background: #475569;
+
 }

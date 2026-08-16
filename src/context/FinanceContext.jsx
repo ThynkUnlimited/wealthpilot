@@ -1,440 +1,1187 @@
-import { createContext, useContext, useMemo, useState } from "react"
-import { initialFinanceData } from "../data/financeData"
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useEffect,
+} from "react"
+
+import { onAuthStateChanged } from "firebase/auth"
+
+import { auth } from "../firebase/firebase"
+
+
+/* =====================================
+   INCOME SERVICE
+===================================== */
+
+import {
+  subscribeToIncome,
+  addIncome as saveIncome,
+  updateIncome as updateIncomeService,
+  deleteIncome as deleteIncomeService,
+} from "../services/incomeService"
+
+
+/* =====================================
+   EXPENSE SERVICE
+===================================== */
+
+import {
+  subscribeToExpenses,
+  addExpense as saveExpense,
+  updateExpense as updateExpenseService,
+  deleteExpense as deleteExpenseService,
+} from "../services/expenseService"
+
+
+/* =====================================
+   BUDGET SERVICE
+===================================== */
+
+import {
+  subscribeToBudgets,
+  addBudget as saveBudget,
+  updateBudget as updateBudgetService,
+  deleteBudget as deleteBudgetService,
+} from "../services/budgetService"
+
+
+/* =====================================
+   ASSET SERVICE
+===================================== */
+
+import {
+  subscribeToAssets,
+  addAsset as saveAsset,
+  updateAsset as updateAssetService,
+  deleteAsset as deleteAssetService,
+} from "../services/assetService"
+
+
+/* =====================================
+   LIABILITY SERVICE
+===================================== */
+
+import {
+  subscribeToLiabilities,
+  addLiability as saveLiability,
+  updateLiability as updateLiabilityService,
+  deleteLiability as deleteLiabilityService,
+  createLoan as createLiabilityService,
+  repayLoan as repayLiabilityService,
+} from "../services/liabilityService"
+
 
 const FinanceContext = createContext()
+
 
 export function FinanceProvider({ children }) {
 
   /* =====================================
-      STATE
-  ====================================== */
+      CORE STATE
+  ===================================== */
 
-  const [income, setIncome] = useState(initialFinanceData.income)
+  const [income, setIncome] = useState([])
 
-  const [expenses, setExpenses] = useState(initialFinanceData.expenses)
+  const [expenses, setExpenses] = useState([])
 
-  const [budgets, setBudgets] = useState(initialFinanceData.budgets)
+  const [budgets, setBudgets] = useState([])
 
-  const [wealthVaults, setWealthVaults] = useState(
-    initialFinanceData.wealthVaults
-  )
+  const [assets, setAssets] = useState([])
 
-  const [vaultTransactions, setVaultTransactions] = useState([])
+  const [liabilities, setLiabilities] = useState([])
 
-  // Temporary until Savings page is migrated
-  const [savingsGoals] = useState(initialFinanceData.savingsGoals)
+  const [loading, setLoading] = useState(true)
 
-  const [investments] = useState(initialFinanceData.investments)
-
-  /* =====================================
-      EXPENSE FUNCTIONS
-  ====================================== */
-
-  const addExpense = (expense) => {
-
-    setExpenses(prev => [
-
-      {
-        id: Date.now(),
-        ...expense,
-        amount: Number(expense.amount),
-        status: "active",
-      },
-
-      ...prev,
-
-    ])
-
-  }
-
-  /* =====================================
-      INCOME FUNCTIONS
-  ====================================== */
-
-  const addIncome = (entry) => {
-
-    setIncome(prev => [
-
-      {
-        id: Date.now(),
-        ...entry,
-        amount: Number(entry.amount),
-        status: "active",
-      },
-
-      ...prev,
-
-    ])
-
-  }
 
   /* =====================================
       WEALTH VAULT
-  ====================================== */
+  ===================================== */
 
-  const addWealthVault = (vault) => {
+  const [wealthVaults, setWealthVaults] =
+    useState([])
 
-    setWealthVaults(prev => [
+  const [vaultTransactions, setVaultTransactions] =
+    useState([])
 
-      ...prev,
 
-      {
+  /* =====================================
+      SAVINGS / INVESTMENTS
+  ===================================== */
 
-        id: Date.now(),
+  const [savingsGoals] = useState([])
 
-        title: vault.title,
+  const [investments] = useState([])
 
-        target: Number(vault.target),
 
-        balance: 0,
+  /* =====================================
+      REALTIME FIRESTORE
+  ===================================== */
 
-        monthlyContribution: Number(
-          vault.monthlyContribution || 0
-        ),
+  useEffect(() => {
 
-        priority: vault.priority,
+    let unsubscribeIncome = () => {}
 
-        icon: vault.icon,
+    let unsubscribeExpenses = () => {}
 
-        createdAt: new Date().toISOString().split("T")[0],
+    let unsubscribeBudgets = () => {}
 
-      },
+    let unsubscribeAssets = () => {}
 
-    ])
+    let unsubscribeLiabilities = () => {}
 
-  }
 
-  const depositToVault = ({ vaultId, amount, source }) => {
+    const unsubscribeAuth =
+      onAuthStateChanged(
 
-    const deposit = Number(amount)
+        auth,
 
-    if (deposit <= 0) return
+        (user) => {
 
-    setWealthVaults(prev =>
+          /* ==========================
+             USER LOGGED OUT
+          ========================== */
 
-      prev.map(vault =>
+          if (!user) {
 
-        vault.id === vaultId
+            unsubscribeIncome()
 
-          ? {
+            unsubscribeExpenses()
 
-              ...vault,
+            unsubscribeBudgets()
 
-              balance: vault.balance + deposit,
+            unsubscribeAssets()
 
-            }
+            unsubscribeLiabilities()
 
-          : vault
+
+            setIncome([])
+
+            setExpenses([])
+
+            setBudgets([])
+
+            setAssets([])
+
+            setLiabilities([])
+
+            setLoading(false)
+
+            return
+
+          }
+
+
+          /* ==========================
+             INCOME
+          ========================== */
+
+          unsubscribeIncome =
+            subscribeToIncome((data) => {
+
+              setIncome(data)
+
+              setLoading(false)
+
+            })
+
+
+          /* ==========================
+             EXPENSES
+          ========================== */
+
+          unsubscribeExpenses =
+            subscribeToExpenses((data) => {
+
+              setExpenses(data)
+
+            })
+
+
+          /* ==========================
+             BUDGETS
+          ========================== */
+
+          unsubscribeBudgets =
+            subscribeToBudgets((data) => {
+
+              setBudgets(data)
+
+            })
+
+
+          /* ==========================
+             ASSETS
+          ========================== */
+
+          unsubscribeAssets =
+            subscribeToAssets((data) => {
+
+              setAssets(data)
+
+            })
+
+
+          /* ==========================
+             LIABILITIES
+          ========================== */
+
+          unsubscribeLiabilities =
+            subscribeToLiabilities((data) => {
+
+              setLiabilities(data)
+
+            })
+
+        }
 
       )
 
-    )
 
-    setVaultTransactions(prev => [
+    return () => {
 
-      {
+      unsubscribeIncome()
 
-        id: Date.now(),
+      unsubscribeExpenses()
 
-        vaultId,
+      unsubscribeBudgets()
 
-        amount: deposit,
+      unsubscribeAssets()
 
-        source,
+      unsubscribeLiabilities()
 
-        date: new Date().toISOString().split("T")[0],
+      unsubscribeAuth()
 
-      },
+    }
 
-      ...prev,
+  }, [])
 
-    ])
+
+  /* =====================================
+      INCOME
+  ===================================== */
+
+  const addIncome = async (entry) => {
+
+    await saveIncome(entry)
 
   }
+
+
+  const updateIncome = async (
+    id,
+    data
+  ) => {
+
+    await updateIncomeService(
+      id,
+      data
+    )
+
+  }
+
+
+  const deleteIncome = async (id) => {
+
+    await deleteIncomeService(id)
+
+  }
+
+
+  /* =====================================
+      EXPENSES
+  ===================================== */
+
+  const addExpense = async (expense) => {
+
+    await saveExpense(expense)
+
+  }
+
+
+  const updateExpense = async (
+    id,
+    data
+  ) => {
+
+    await updateExpenseService(
+      id,
+      data
+    )
+
+  }
+
+
+  const deleteExpense = async (id) => {
+
+    await deleteExpenseService(id)
+
+  }
+
+
+  /* =====================================
+      BUDGETS
+  ===================================== */
+
+  const addBudget = async (budget) => {
+
+    await saveBudget(budget)
+
+  }
+
+
+  const updateBudget = async (
+    id,
+    data
+  ) => {
+
+    await updateBudgetService(
+      id,
+      data
+    )
+
+  }
+
+
+  const deleteBudget = async (id) => {
+
+    await deleteBudgetService(id)
+
+  }
+
+
+  /* =====================================
+      ASSETS
+  ===================================== */
+
+  const addAsset = async (asset) => {
+
+    await saveAsset(asset)
+
+  }
+
+
+  const updateAsset = async (
+    id,
+    data
+  ) => {
+
+    await updateAssetService(
+      id,
+      data
+    )
+
+  }
+
+
+  const deleteAsset = async (id) => {
+
+    await deleteAssetService(id)
+
+  }
+
+
+  /* =====================================
+      LIABILITIES
+  ===================================== */
+
+  const addLiability = async (
+    liability
+  ) => {
+
+    await saveLiability(
+      liability
+    )
+
+  }
+
+
+  const updateLiability = async (
+    id,
+    data
+  ) => {
+
+    await updateLiabilityService(
+      id,
+      data
+    )
+
+  }
+
+
+  const deleteLiability = async (
+    id
+  ) => {
+
+    await deleteLiabilityService(
+      id
+    )
+
+  }
+
+
+  /* =====================================
+      CREATE CONNECTED LOAN
+  =====================================
+
+      Loan creation performs 3 actions:
+
+      1. Creates liability
+      2. Increases linked asset
+      3. Records LOAN_DISBURSEMENT
+  ===================================== */
+
+  const createLoan = async (loan) => {
+
+    return await createLiabilityService(
+      loan
+    )
+
+  }
+
+
+  /* =====================================
+      REPAY LOAN
+  =====================================
+
+      Repayment performs:
+
+      1. Reduces loan liability
+      2. Reduces linked asset
+      3. Records LOAN_REPAYMENT
+
+      Interest is separated from principal.
+  ===================================== */
+
+  const repayLoan = async (repayment) => {
+
+    return await repayLiabilityService(
+      repayment
+    )
+
+  }
+
+
+  /* =====================================
+      WEALTH VAULT
+  ===================================== */
+
+  const addWealthVault = (vault) => {
+
+    const newVault = {
+
+      id:
+        Date.now(),
+
+      title:
+        vault.title,
+
+      target:
+        Number(
+          vault.target || 0
+        ),
+
+      balance:
+        0,
+
+      monthlyContribution:
+        Number(
+          vault.monthlyContribution || 0
+        ),
+
+      priority:
+        vault.priority,
+
+      icon:
+        vault.icon,
+
+      createdAt:
+        new Date()
+          .toISOString()
+          .split("T")[0],
+
+    }
+
+
+    setWealthVaults(
+      (previous) => [
+
+        ...previous,
+
+        newVault,
+
+      ]
+    )
+
+  }
+
+
+  const depositToVault = ({
+    vaultId,
+    amount,
+    source,
+  }) => {
+
+    const deposit =
+      Number(amount)
+
+
+    if (deposit <= 0) {
+      return
+    }
+
+
+    setWealthVaults(
+      (previous) =>
+
+        previous.map(
+          (vault) =>
+
+            vault.id === vaultId
+
+              ? {
+
+                  ...vault,
+
+                  balance:
+                    Number(
+                      vault.balance || 0
+                    ) + deposit,
+
+                }
+
+              : vault
+
+        )
+
+    )
+
+
+    setVaultTransactions(
+      (previous) => [
+
+        {
+
+          id:
+            Date.now(),
+
+          vaultId,
+
+          amount:
+            deposit,
+
+          source,
+
+          date:
+            new Date()
+              .toISOString()
+              .split("T")[0],
+
+        },
+
+        ...previous,
+
+      ]
+
+    )
+
+  }
+
 
   /* =====================================
       CREDIT NOTES
-  ====================================== */
+  ===================================== */
 
-  const issueCreditNote = ({ type, id, reason }) => {
+  const issueCreditNote = ({
+    type,
+    id,
+    reason,
+  }) => {
 
-    if (type === "income") {
-
-      const original = income.find(item => item.id === id)
-
-      if (!original) return
-
-      const creditNote = {
-
-        id: Date.now(),
-
-        title: `Credit Note - ${original.title}`,
-
-        category: original.category,
-
-        amount: -Math.abs(original.amount),
-
-        date: new Date().toISOString().split("T")[0],
-
-        status: "credit-note",
-
+    console.log(
+      "Credit Note",
+      {
+        type,
+        id,
         reason,
-
-        referenceId: original.id,
-
       }
-
-      setIncome(prev => [
-
-        creditNote,
-
-        ...prev.map(item =>
-
-          item.id === id
-
-            ? {
-
-                ...item,
-
-                status: "reversed",
-
-              }
-
-            : item
-
-        ),
-
-      ])
-
-    }
-
-    if (type === "expense") {
-
-      const original = expenses.find(item => item.id === id)
-
-      if (!original) return
-
-      const creditNote = {
-
-        id: Date.now(),
-
-        title: `Credit Note - ${original.title}`,
-
-        category: original.category,
-
-        amount: -Math.abs(original.amount),
-
-        date: new Date().toISOString().split("T")[0],
-
-        status: "credit-note",
-
-        reason,
-
-        referenceId: original.id,
-
-      }
-
-      setExpenses(prev => [
-
-        creditNote,
-
-        ...prev.map(item =>
-
-          item.id === id
-
-            ? {
-
-                ...item,
-
-                status: "reversed",
-
-              }
-
-            : item
-
-        ),
-
-      ])
-
-    }
+    )
 
   }
 
+
   /* =====================================
-      TOTALS
-  ====================================== */
+      TOTAL INCOME
+  ===================================== */
 
-  const totalIncome = useMemo(() => {
+  const totalIncome =
+    useMemo(
 
-    return income.reduce(
+      () =>
 
-      (sum, item) => sum + item.amount,
+        income.reduce(
 
-      0
+          (sum, item) =>
 
-    )
+            sum +
+            Number(
+              item.amount || 0
+            ),
 
-  }, [income])
+          0
 
-  const totalExpenses = useMemo(() => {
+        ),
 
-    return expenses.reduce(
-
-      (sum, item) => sum + item.amount,
-
-      0
-
-    )
-
-  }, [expenses])
-
-  const totalSavings = useMemo(() => {
-
-    return savingsGoals.reduce(
-
-      (sum, goal) => sum + goal.saved,
-
-      0
+      [income]
 
     )
 
-  }, [savingsGoals])
 
-  const totalVaultBalance = useMemo(() => {
+  /* =====================================
+      TOTAL EXPENSES
+  ===================================== */
 
-    return wealthVaults.reduce(
+  const totalExpenses =
+    useMemo(
 
-      (sum, vault) => sum + vault.balance,
+      () =>
 
-      0
+        expenses.reduce(
 
-    )
+          (sum, item) =>
 
-  }, [wealthVaults])
+            sum +
+            Number(
+              item.amount || 0
+            ),
 
-  const totalBudget = useMemo(() => {
+          0
 
-    return budgets.reduce(
+        ),
 
-      (sum, item) => sum + item.budget,
-
-      0
-
-    )
-
-  }, [budgets])
-
-  const totalSpentBudget = useMemo(() => {
-
-    return budgets.reduce(
-
-      (sum, item) => sum + item.spent,
-
-      0
+      [expenses]
 
     )
 
-  }, [budgets])
 
-  const balance = totalIncome - totalExpenses
+  /* =====================================
+      TOTAL ASSETS
+  ===================================== */
+
+  const totalAssets =
+    useMemo(
+
+      () =>
+
+        assets.reduce(
+
+          (sum, asset) =>
+
+            sum +
+            Number(
+              asset.value || 0
+            ),
+
+          0
+
+        ),
+
+      [assets]
+
+    )
+
+
+  /* =====================================
+      TOTAL LIABILITIES
+  ===================================== */
+
+  const totalLiabilities =
+    useMemo(
+
+      () =>
+
+        liabilities.reduce(
+
+          (sum, liability) =>
+
+            sum +
+            Number(
+              liability.currentBalance ??
+              liability.outstandingBalance ??
+              liability.principalAmount ??
+              liability.originalAmount ??
+              0
+            ),
+
+          0
+
+        ),
+
+      [liabilities]
+
+    )
+
+
+  /* =====================================
+      NET WORTH
+  ===================================== */
+
+  const netWorth =
+    totalAssets -
+    totalLiabilities
+
+
+  /* =====================================
+      SAVINGS
+  ===================================== */
+
+  const totalSavings =
+    useMemo(
+
+      () =>
+
+        savingsGoals.reduce(
+
+          (sum, goal) =>
+
+            sum +
+            Number(
+              goal.saved || 0
+            ),
+
+          0
+
+        ),
+
+      [savingsGoals]
+
+    )
+
+
+  /* =====================================
+      WEALTH VAULT
+  ===================================== */
+
+  const totalVaultBalance =
+    useMemo(
+
+      () =>
+
+        wealthVaults.reduce(
+
+          (sum, vault) =>
+
+            sum +
+            Number(
+              vault.balance || 0
+            ),
+
+          0
+
+        ),
+
+      [wealthVaults]
+
+    )
+
+
+  /* =====================================
+      BUDGET
+  ===================================== */
+
+  const totalBudget =
+    useMemo(
+
+      () =>
+
+        budgets.reduce(
+
+          (sum, budget) =>
+
+            sum +
+            Number(
+              budget.amount ??
+              budget.budget ??
+              0
+            ),
+
+          0
+
+        ),
+
+      [budgets]
+
+    )
+
+
+  /* =====================================
+      TOTAL SPENT
+  ===================================== */
+
+  const totalSpentBudget =
+    useMemo(
+
+      () =>
+
+        expenses.reduce(
+
+          (sum, expense) =>
+
+            sum +
+            Number(
+              expense.amount || 0
+            ),
+
+          0
+
+        ),
+
+      [expenses]
+
+    )
+
+
+  /* =====================================
+      BALANCE
+  ===================================== */
+
+  const balance =
+    totalIncome -
+    totalExpenses
+
+
+  /* =====================================
+      SAVINGS RATE
+  ===================================== */
 
   const savingsRate =
 
     totalIncome > 0
 
-      ? Math.round((totalSavings / totalIncome) * 100)
+      ? Math.round(
+          (
+            totalSavings /
+            totalIncome
+          ) * 100
+        )
 
       : 0
+
+
+  /* =====================================
+      WEALTH PROTECTION RATE
+  ===================================== */
 
   const wealthProtectionRate =
 
     totalIncome > 0
 
-      ? Math.round((totalVaultBalance / totalIncome) * 100)
+      ? Math.round(
+          (
+            totalVaultBalance /
+            totalIncome
+          ) * 100
+        )
 
       : 0
+
+
+  /* =====================================
+      BUDGET USAGE
+  ===================================== */
 
   const budgetUsage =
 
     totalBudget > 0
 
-      ? Math.round((totalSpentBudget / totalBudget) * 100)
+      ? Math.round(
+          (
+            totalSpentBudget /
+            totalBudget
+          ) * 100
+        )
 
       : 0
 
+
+  /* =====================================
+      BUDGET SUMMARY
+  ===================================== */
+
+  const budgetSummary =
+    useMemo(() => {
+
+      return budgets.map(
+        (budget) => {
+
+          const budgetCategory =
+            budget.category ||
+            budget.name
+
+
+          const budgetAmount =
+            Number(
+              budget.amount ??
+              budget.budget ??
+              0
+            )
+
+
+          const spent =
+            expenses
+
+              .filter(
+                (expense) =>
+
+                  expense.category ===
+                  budgetCategory
+
+              )
+
+              .reduce(
+
+                (sum, expense) =>
+
+                  sum +
+                  Number(
+                    expense.amount || 0
+                  ),
+
+                0
+
+              )
+
+
+          return {
+
+            ...budget,
+
+            spent,
+
+            remaining:
+              budgetAmount -
+              spent,
+
+            percentage:
+              budgetAmount > 0
+
+                ? Math.min(
+                    100,
+                    Math.round(
+                      (
+                        spent /
+                        budgetAmount
+                      ) * 100
+                    )
+                  )
+
+                : 0,
+
+          }
+
+        }
+      )
+
+    }, [
+      budgets,
+      expenses,
+    ])
+
+
   /* =====================================
       TRANSACTIONS
-  ====================================== */
+  ===================================== */
 
-  const transactions = useMemo(() => {
+  const transactions =
+    useMemo(() => {
 
-    return [
+      return [
 
-      ...income.map(item => ({
+        ...income.map(
+          (item) => ({
 
-        ...item,
+            ...item,
 
-        type: "income",
+            type:
+              "income",
 
-      })),
+          })
+        ),
 
-      ...expenses.map(item => ({
 
-        ...item,
+        ...expenses.map(
+          (item) => ({
 
-        type: "expense",
+            ...item,
 
-      })),
+            type:
+              "expense",
 
-    ].sort(
+          })
+        ),
 
-      (a, b) => new Date(b.date) - new Date(a.date)
+      ].sort(
 
-    )
+        (a, b) =>
 
-  }, [income, expenses])
+          new Date(
+            b.date ||
+            b.createdAt ||
+            0
+          ) -
+
+          new Date(
+            a.date ||
+            a.createdAt ||
+            0
+          )
+
+      )
+
+    }, [
+      income,
+      expenses,
+    ])
+
 
   /* =====================================
-      CONTEXT
-  ====================================== */
+      CONTEXT VALUE
+  ===================================== */
 
   const value = {
 
+    loading,
+
+
+    /* ==========================
+       INCOME
+    ========================== */
+
     income,
+
+    addIncome,
+
+    updateIncome,
+
+    deleteIncome,
+
+
+    /* ==========================
+       EXPENSES
+    ========================== */
 
     expenses,
 
+    addExpense,
+
+    updateExpense,
+
+    deleteExpense,
+
+
+    /* ==========================
+       BUDGETS
+    ========================== */
+
     budgets,
+
+    budgetSummary,
+
+    addBudget,
+
+    updateBudget,
+
+    deleteBudget,
+
+
+    /* ==========================
+       ASSETS
+    ========================== */
+
+    assets,
+
+    totalAssets,
+
+    addAsset,
+
+    updateAsset,
+
+    deleteAsset,
+
+
+    /* ==========================
+       LIABILITIES
+    ========================== */
+
+    liabilities,
+
+    totalLiabilities,
+
+    addLiability,
+
+    updateLiability,
+
+    deleteLiability,
+
+    createLoan,
+
+    repayLoan,
+
+
+    /* ==========================
+       WEALTH VAULT
+    ========================== */
 
     wealthVaults,
 
     vaultTransactions,
 
-    savingsGoals,
-
-    investments,
-
-    transactions,
-
-    addIncome,
-
-    addExpense,
-
     addWealthVault,
 
     depositToVault,
 
-    issueCreditNote,
+
+    /* ==========================
+       SAVINGS
+    ========================== */
+
+    savingsGoals,
+
+    totalSavings,
+
+
+    /* ==========================
+       INVESTMENTS
+    ========================== */
+
+    investments,
+
+
+    /* ==========================
+       TRANSACTIONS
+    ========================== */
+
+    transactions,
+
+
+    /* ==========================
+       FINANCIAL TOTALS
+    ========================== */
 
     totalIncome,
 
     totalExpenses,
 
-    totalSavings,
+    balance,
+
+    netWorth,
 
     totalVaultBalance,
 
-    balance,
+    totalBudget,
+
+    totalSpentBudget,
 
     savingsRate,
 
@@ -442,11 +1189,21 @@ export function FinanceProvider({ children }) {
 
     budgetUsage,
 
+
+    /* ==========================
+       AUDIT
+    ========================== */
+
+    issueCreditNote,
+
   }
+
 
   return (
 
-    <FinanceContext.Provider value={value}>
+    <FinanceContext.Provider
+      value={value}
+    >
 
       {children}
 
@@ -456,8 +1213,11 @@ export function FinanceProvider({ children }) {
 
 }
 
+
 export function useFinance() {
 
-  return useContext(FinanceContext)
+  return useContext(
+    FinanceContext
+  )
 
 }

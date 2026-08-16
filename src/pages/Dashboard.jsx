@@ -1,92 +1,348 @@
+import { useNavigate } from "react-router-dom"
+
 import AppLayout from "../components/layout/AppLayout"
+import PageHeader from "../components/ui/PageHeader"
+import Card from "../components/ui/Card"
 
-import BalanceOverview from "../components/dashboard/BalanceOverview"
-import FinancialMetrics from "../components/dashboard/FinancialMetrics"
-import MonthlyOverview from "../components/dashboard/MonthlyOverview"
-import FinancialHealth from "../components/dashboard/FinancialHealth"
-import LiveSummary from "../components/dashboard/LiveSummary"
-import LiveBudgetCard from "../components/dashboard/LiveBudgetCard"
-import LiveSavingsCard from "../components/dashboard/LiveSavingsCard"
-import LiveTransactions from "../components/dashboard/LiveTransactions"
-import QuickActions from "../components/dashboard/QuickActions"
-import UpcomingBills from "../components/dashboard/UpcomingBills"
-import AIInsight from "../components/dashboard/AIInsight"
+import { useFinance } from "../context/FinanceContext"
 
-import dashboardData from "../data/dashboardData"
+import DashboardMetrics from "../features/dashboard/components/DashboardMetrics"
+import FinancialHealth from "../features/dashboard/components/FinancialHealth"
+import AIInsights from "../features/dashboard/components/AIInsights"
+import RecentActivity from "../features/dashboard/components/RecentActivity"
 
 export default function Dashboard() {
+
+  const navigate = useNavigate()
+
+  const {
+    budgetSummary,
+  } = useFinance()
 
   return (
 
     <AppLayout>
 
-      <div className="mx-auto max-w-7xl space-y-6">
+      <PageHeader
+        title="Dashboard"
+        subtitle="Welcome back. Here's your financial overview."
+      />
 
-        {/* Welcome */}
+      <div className="space-y-6">
 
-        <section>
+        {/* =========================================
+            KPI CARDS
+        ========================================= */}
 
-          <h1 className="text-2xl font-bold text-slate-900">
+        <DashboardMetrics />
 
-            {dashboardData.user.greeting}
+        {/* =========================================
+            FINANCIAL HEALTH & AI
+        ========================================= */}
 
-          </h1>
-
-          <p className="mt-1 text-sm text-slate-500">
-
-            Welcome back, {dashboardData.user.name}.
-
-          </p>
-
-        </section>
-
-        {/* Balance */}
-
-        <BalanceOverview />
-
-        {/* Financial Metrics */}
-
-        <FinancialMetrics />
-
-        {/* Monthly Overview */}
-
-        <MonthlyOverview />
-
-        {/* Live Summary */}
-
-        <LiveSummary />
-
-        {/* Quick Actions */}
-
-        <QuickActions />
-
-        {/* Health + Budget */}
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 xl:grid-cols-2">
 
           <FinancialHealth />
 
-          <LiveBudgetCard />
+          <AIInsights />
 
         </div>
 
-        {/* Live Savings */}
+        {/* =========================================
+            RECENT ACTIVITY & BUDGET OVERVIEW
+        ========================================= */}
 
-        <LiveSavingsCard />
+        <div className="grid gap-6 xl:grid-cols-2">
 
-        {/* Transactions + Bills */}
+          {/* Recent Activity */}
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <RecentActivity />
 
-          <LiveTransactions />
+          {/* Budget Overview */}
 
-          <UpcomingBills />
+          <Card>
+
+            <div className="flex items-center justify-between">
+
+              <div>
+
+                <h3 className="text-xl font-bold">
+
+                  Budget Overview
+
+                </h3>
+
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+
+                  Monitor your monthly spending progress.
+
+                </p>
+
+              </div>
+
+              <button
+
+                onClick={() => navigate("/budget")}
+
+                className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+
+              >
+
+                View Budget
+
+              </button>
+
+            </div>
+
+            <div className="mt-6 space-y-5">
+
+              {budgetSummary.length === 0 ? (
+
+                <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center dark:border-slate-700">
+
+                  <p className="font-medium text-slate-600 dark:text-slate-300">
+
+                    No budgets created yet.
+
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-500">
+
+                    Create your monthly budget to start tracking your spending.
+
+                  </p>
+
+                  <button
+
+                    onClick={() => navigate("/budget")}
+
+                    className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+
+                  >
+
+                    + Create Budget
+
+                  </button>
+
+                </div>
+
+              ) : (
+
+                budgetSummary.map((budget) => {
+
+                  const percentage = Math.min(
+
+                    100,
+
+                    Math.max(
+
+                      0,
+
+                      Number(budget.percentage || 0)
+
+                    )
+
+                  )
+
+                  const isOverBudget =
+
+                    Number(budget.spent || 0) >
+
+                    Number(budget.amount || 0)
+
+                  const isWarning =
+
+                    percentage >= 80 &&
+
+                    !isOverBudget
+
+                  let barColor = "bg-emerald-600"
+
+                  let textColor = "text-slate-900 dark:text-white"
+
+                  if (isOverBudget) {
+
+                    barColor = "bg-red-500"
+
+                    textColor = "text-red-600"
+
+                  } else if (isWarning) {
+
+                    barColor = "bg-amber-500"
+
+                    textColor = "text-amber-600"
+
+                  }
+
+                  return (
+
+                    <div
+
+                      key={budget.id}
+
+                    >
+
+                      <div className="mb-2 flex items-center justify-between">
+
+                        <span className="font-medium">
+
+                          {budget.icon || "📊"}{" "}
+
+                          {budget.name || budget.category}
+
+                        </span>
+
+                        <span
+
+                          className={`font-semibold ${textColor}`}
+
+                        >
+
+                          {percentage}%
+
+                        </span>
+
+                      </div>
+
+                      <div className="mb-2 flex justify-between text-xs text-slate-500">
+
+                        <span>
+
+                          KSh{" "}
+
+                          {Number(
+
+                            budget.spent || 0
+
+                          ).toLocaleString()}
+
+                          {" "}spent
+
+                        </span>
+
+                        <span>
+
+                          KSh{" "}
+
+                          {Number(
+
+                            budget.amount || 0
+
+                          ).toLocaleString()}
+
+                        </span>
+
+                      </div>
+
+                      <div className="h-3 rounded-full bg-slate-200 dark:bg-slate-700">
+
+                        <div
+
+                          className={`h-3 rounded-full transition-all ${barColor}`}
+
+                          style={{
+
+                            width: `${percentage}%`,
+
+                          }}
+
+                        />
+
+                      </div>
+
+                    </div>
+
+                  )
+
+                })
+
+              )}
+
+            </div>
+
+          </Card>
 
         </div>
 
-        {/* AI Coach */}
+        {/* =========================================
+            QUICK ACTIONS
+        ========================================= */}
 
-        <AIInsight />
+        <Card>
+
+          <div className="flex items-center justify-between">
+
+            <div>
+
+              <h3 className="text-xl font-bold">
+
+                Quick Actions
+
+              </h3>
+
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+
+                Quickly record your financial activities.
+
+              </p>
+
+            </div>
+
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
+            <button
+
+              onClick={() => navigate("/income")}
+
+              className="rounded-xl bg-blue-600 py-4 font-semibold text-white transition hover:bg-blue-700"
+
+            >
+
+              + Add Income
+
+            </button>
+
+            <button
+
+              onClick={() => navigate("/expenses")}
+
+              className="rounded-xl bg-red-600 py-4 font-semibold text-white transition hover:bg-red-700"
+
+            >
+
+              + Add Expense
+
+            </button>
+
+            <button
+
+              onClick={() => navigate("/budget")}
+
+              className="rounded-xl bg-emerald-600 py-4 font-semibold text-white transition hover:bg-emerald-700"
+
+            >
+
+              + Budget
+
+            </button>
+
+            <button
+
+              onClick={() => navigate("/wealth-vault")}
+
+              className="rounded-xl bg-purple-600 py-4 font-semibold text-white transition hover:bg-purple-700"
+
+            >
+
+              + Wealth Vault
+
+            </button>
+
+          </div>
+
+        </Card>
 
       </div>
 

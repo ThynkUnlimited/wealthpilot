@@ -1,75 +1,103 @@
+import {
+  LayoutDashboard,
+  ArrowLeftRight,
+  Activity,
+  Receipt,
+  Wallet,
+  PiggyBank,
+  Landmark,
+  CreditCard,
+  Vault,
+  Target,
+  BarChart3,
+  FileText,
+  Settings,
+} from "lucide-react"
+
 const navigation = [
 
   {
     name: "Dashboard",
     path: "/dashboard",
-    icon: "🏠",
+    icon: LayoutDashboard,
   },
 
   {
     name: "Transactions",
     path: "/transactions",
-    icon: "📑",
+    icon: ArrowLeftRight,
   },
 
   {
     name: "Activity Centre",
     path: "/activity",
-    icon: "📋",
+    icon: Activity,
   },
 
   {
     name: "Expenses",
     path: "/expenses",
-    icon: "💸",
+    icon: Receipt,
   },
 
   {
     name: "Income",
     path: "/income",
-    icon: "💰",
+    icon: Wallet,
   },
 
   {
     name: "Budget",
     path: "/budget",
-    icon: "📊",
+    icon: PiggyBank,
+  },
+
+  {
+    name: "Assets",
+    path: "/assets",
+    icon: Landmark,
+  },
+
+  {
+    name: "Liabilities",
+    path: "/liabilities",
+    icon: CreditCard,
   },
 
   {
     name: "Savings",
     path: "/savings",
-    icon: "🏦",
+    icon: PiggyBank,
   },
 
   {
     name: "Wealth Vault",
     path: "/wealth-vault",
-    icon: "🔐",
+    icon: Vault,
   },
 
   {
     name: "Financial Planner",
     path: "/planner",
-    icon: "🧠",
+    icon: Target,
   },
 
   {
     name: "Analytics",
     path: "/analytics",
-    icon: "📈",
+    icon: BarChart3,
   },
 
   {
     name: "Reports",
     path: "/reports",
-    icon: "📄",
+    icon: FileText,
   },
 
   {
     name: "Settings",
     path: "/settings",
-    icon: "⚙️",
+    icon: Settings,
   },
 
 ]

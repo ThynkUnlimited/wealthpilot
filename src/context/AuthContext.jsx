@@ -17,10 +17,11 @@ const AuthContext = createContext()
 export function AuthProvider({ children }) {
 
   const [user, setUser] = useState(null)
-
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+
+    console.log("🚀 AuthContext started")
 
     const unsubscribe = onAuthStateChanged(
 
@@ -28,21 +29,46 @@ export function AuthProvider({ children }) {
 
       (currentUser) => {
 
-        setUser(currentUser)
+        console.log("==============================")
+        console.log("🔥 AUTH STATE CHANGED")
+        console.log(currentUser)
 
+        if (currentUser) {
+
+          console.log("✅ User is logged in")
+
+        } else {
+
+          console.log("❌ No user logged in")
+
+        }
+
+        setUser(currentUser)
         setLoading(false)
+
+        console.log("✅ Loading finished")
 
       }
 
     )
 
-    return unsubscribe
+    return () => unsubscribe()
 
   }, [])
 
-  const logout = () => {
+  const logout = async () => {
 
-    return signOut(auth)
+    await signOut(auth)
+
+  }
+
+  if (loading) {
+
+    return (
+      <div className="flex h-screen items-center justify-center text-2xl font-bold">
+        Loading...
+      </div>
+    )
 
   }
 
@@ -51,16 +77,14 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
 
       value={{
-
         user,
-
+        loading,
         logout,
-
       }}
 
     >
 
-      {!loading && children}
+      {children}
 
     </AuthContext.Provider>
 
