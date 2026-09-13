@@ -14,6 +14,10 @@ import {
 } from "../services/liabilityService"
 
 import {
+  subscribeToAssets,
+} from "../services/assetService"
+
+import {
   recordLoanRepayment,
 } from "../services/loanRepayment"
 
@@ -41,24 +45,24 @@ const emptyForm = {
 ===================================== */
 
 const emptyRepaymentForm = {
+  assetId: "",
   amount: "",
   interestAmount: "0",
-  paymentDate:
-    new Date()
-      .toISOString()
-      .split("T")[0],
-  notes: "",
+  paymentDate: new Date()
+    .toISOString()
+    .split("T")[0],
+  reference: "",
 }
 
 
 /* =====================================
-   COMPONENT
+   MAIN COMPONENT
 ===================================== */
 
 export default function Liabilities() {
 
   /* =====================================
-     STATE
+     LIABILITIES
   ===================================== */
 
   const [liabilities, setLiabilities] =
@@ -67,14 +71,51 @@ export default function Liabilities() {
   const [loading, setLoading] =
     useState(true)
 
+
+  /* =====================================
+     ASSETS
+  ===================================== */
+
+  const [assets, setAssets] =
+    useState([])
+
+  const [assetsLoading, setAssetsLoading] =
+    useState(true)
+
+
+  /* =====================================
+     MODALS
+  ===================================== */
+
   const [showModal, setShowModal] =
     useState(false)
 
   const [showRepaymentModal, setShowRepaymentModal] =
     useState(false)
 
+
+  /* =====================================
+     SELECTED LIABILITY
+  ===================================== */
+
   const [selectedLiability, setSelectedLiability] =
     useState(null)
+
+
+  /* =====================================
+     FORM STATE
+  ===================================== */
+
+  const [form, setForm] =
+    useState(emptyForm)
+
+  const [repaymentForm, setRepaymentForm] =
+    useState(emptyRepaymentForm)
+
+
+  /* =====================================
+     PROCESSING STATE
+  ===================================== */
 
   const [saving, setSaving] =
     useState(false)
@@ -82,28 +123,21 @@ export default function Liabilities() {
   const [repaying, setRepaying] =
     useState(false)
 
+
+  /* =====================================
+     ERROR
+  ===================================== */
+
   const [error, setError] =
     useState("")
 
 
   /* =====================================
-     LIABILITY FORM
+     SUCCESS MESSAGE
   ===================================== */
 
-  const [form, setForm] =
-    useState({
-      ...emptyForm,
-    })
-
-
-  /* =====================================
-     REPAYMENT FORM
-  ===================================== */
-
-  const [repaymentForm, setRepaymentForm] =
-    useState({
-      ...emptyRepaymentForm,
-    })
+  const [successMessage, setSuccessMessage] =
+    useState("")
 
 
   /* =====================================
@@ -134,7 +168,7 @@ export default function Liabilities() {
     } catch (err) {
 
       console.error(
-        "Liability loading error:",
+        "Unable to load liabilities:",
         err
       )
 
@@ -146,6 +180,59 @@ export default function Liabilities() {
 
     }
 
+    return () => {
+
+      if (
+        typeof unsubscribe ===
+        "function"
+      ) {
+
+        unsubscribe()
+
+      }
+
+    }
+
+  }, [])
+
+
+  /* =====================================
+     LOAD ASSETS
+  ===================================== */
+
+  useEffect(() => {
+
+    let unsubscribe = () => {}
+
+    try {
+
+      unsubscribe =
+        subscribeToAssets(
+          (data) => {
+
+            setAssets(
+              Array.isArray(data)
+                ? data
+                : []
+            )
+
+            setAssetsLoading(false)
+
+          }
+        )
+
+    } catch (err) {
+
+      console.error(
+        "Unable to load assets:",
+        err
+      )
+
+      setAssets([])
+
+      setAssetsLoading(false)
+
+    }
 
     return () => {
 
@@ -228,7 +315,7 @@ export default function Liabilities() {
 
 
   /* =====================================
-     LIABILITY FORM CHANGE
+     FORM CHANGE
   ===================================== */
 
   const handleChange = (e) => {
@@ -257,12 +344,10 @@ export default function Liabilities() {
       value,
     } = e.target
 
-    setRepaymentForm(
-      (previous) => ({
-        ...previous,
-        [name]: value,
-      })
-    )
+    setRepaymentForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }))
 
   }
 
@@ -274,6 +359,7 @@ export default function Liabilities() {
   const openAddModal = () => {
 
     setError("")
+    setSuccessMessage("")
 
     setForm({
       ...emptyForm,
@@ -300,8 +386,6 @@ export default function Liabilities() {
       ...emptyForm,
     })
 
-    setError("")
-
   }
 
 
@@ -314,7 +398,7 @@ export default function Liabilities() {
     e.preventDefault()
 
     setError("")
-
+    setSuccessMessage("")
 
     const principal =
       Number(
@@ -333,8 +417,7 @@ export default function Liabilities() {
 
     const monthlyPayment =
       Number(
-        form.minimumMonthlyPayment ||
-        0
+        form.minimumMonthlyPayment || 0
       )
 
     const termMonths =
@@ -343,9 +426,7 @@ export default function Liabilities() {
       )
 
 
-    /* ================================
-       VALIDATION
-    ================================= */
+    /* VALIDATION */
 
     if (!form.name.trim()) {
 
@@ -426,7 +507,6 @@ export default function Liabilities() {
 
     setSaving(true)
 
-
     try {
 
       await addLiability({
@@ -475,13 +555,13 @@ export default function Liabilities() {
         ...emptyForm,
       })
 
+      setSuccessMessage(
+        "Liability added successfully."
+      )
 
     } catch (err) {
 
-      console.error(
-        "Add liability error:",
-        err
-      )
+      console.error(err)
 
       setError(
         err.message ||
@@ -506,16 +586,36 @@ export default function Liabilities() {
   ) => {
 
     setError("")
+    setSuccessMessage("")
 
     setSelectedLiability(
       liability
     )
 
+
+    /*
+      If the loan already has a linked
+      asset, use it automatically.
+    */
+
+    const defaultAssetId =
+      liability.linkedAssetId ||
+      ""
+
+
     setRepaymentForm({
+
       ...emptyRepaymentForm,
+
+      assetId:
+        defaultAssetId,
+
     })
 
-    setShowRepaymentModal(true)
+
+    setShowRepaymentModal(
+      true
+    )
 
   }
 
@@ -530,15 +630,17 @@ export default function Liabilities() {
       return
     }
 
-    setShowRepaymentModal(false)
+    setShowRepaymentModal(
+      false
+    )
 
-    setSelectedLiability(null)
+    setSelectedLiability(
+      null
+    )
 
     setRepaymentForm({
       ...emptyRepaymentForm,
     })
-
-    setError("")
 
   }
 
@@ -552,6 +654,7 @@ export default function Liabilities() {
     e.preventDefault()
 
     setError("")
+    setSuccessMessage("")
 
 
     if (!selectedLiability) {
@@ -565,16 +668,26 @@ export default function Liabilities() {
     }
 
 
-    const amount =
+    /* =================================
+       PAYMENT
+    ================================= */
+
+    const paymentAmount =
       Number(
         repaymentForm.amount || 0
       )
 
-    const interest =
+
+    const interestAmount =
       Number(
-        repaymentForm.interestAmount ||
-        0
+        repaymentForm.interestAmount || 0
       )
+
+
+    const principalAmount =
+      paymentAmount -
+      interestAmount
+
 
     const currentBalance =
       Number(
@@ -584,11 +697,24 @@ export default function Liabilities() {
       )
 
 
-    /* ================================
+    /* =================================
        VALIDATION
     ================================= */
 
-    if (amount <= 0) {
+    if (
+      !repaymentForm.assetId
+    ) {
+
+      setError(
+        "Please select the account used to make this repayment."
+      )
+
+      return
+
+    }
+
+
+    if (paymentAmount <= 0) {
 
       setError(
         "Enter a repayment amount."
@@ -599,7 +725,7 @@ export default function Liabilities() {
     }
 
 
-    if (interest < 0) {
+    if (interestAmount < 0) {
 
       setError(
         "Interest cannot be negative."
@@ -610,7 +736,10 @@ export default function Liabilities() {
     }
 
 
-    if (interest > amount) {
+    if (
+      interestAmount >
+      paymentAmount
+    ) {
 
       setError(
         "Interest cannot be greater than the total payment."
@@ -621,11 +750,9 @@ export default function Liabilities() {
     }
 
 
-    const principalReduction =
-      amount - interest
-
-
-    if (principalReduction <= 0) {
+    if (
+      principalAmount <= 0
+    ) {
 
       setError(
         "The payment must contain some principal reduction."
@@ -637,7 +764,7 @@ export default function Liabilities() {
 
 
     if (
-      principalReduction >
+      principalAmount >
       currentBalance
     ) {
 
@@ -651,17 +778,21 @@ export default function Liabilities() {
 
 
     /* =================================
-       LINKED ASSET
+       CHECK SELECTED ASSET
     ================================= */
 
-    const assetId =
-      selectedLiability.linkedAssetId
+    const selectedAsset =
+      assets.find(
+        (asset) =>
+          asset.id ===
+          repaymentForm.assetId
+      )
 
 
-    if (!assetId) {
+    if (!selectedAsset) {
 
       setError(
-        "This loan does not have a linked asset account. The repayment cannot be processed because WealthPilot needs to know which account the money is coming from."
+        "The selected account could not be found."
       )
 
       return
@@ -669,23 +800,33 @@ export default function Liabilities() {
     }
 
 
+    const assetBalance =
+      Number(
+        selectedAsset.value || 0
+      )
+
+
+    if (
+      paymentAmount >
+      assetBalance
+    ) {
+
+      setError(
+        `Insufficient funds in ${selectedAsset.name || "the selected account"}. Available balance: KSh ${assetBalance.toLocaleString()}.`
+      )
+
+      return
+
+    }
+
+
+    /* =================================
+       PROCESS REPAYMENT
+    ================================= */
+
     setRepaying(true)
 
-
     try {
-
-      /*
-        The repayment service handles:
-
-        1. Reducing the liability
-        2. Reducing the linked asset
-        3. Recording the loan transaction
-        4. Recording interest as an expense
-        5. Updating repayment information
-
-        Everything happens inside
-        one Firestore transaction.
-      */
 
       await recordLoanRepayment({
 
@@ -693,40 +834,47 @@ export default function Liabilities() {
           selectedLiability.id,
 
         assetId:
-          assetId,
+          repaymentForm.assetId,
 
         paymentAmount:
-          amount,
+          paymentAmount,
 
         principalAmount:
-          principalReduction,
+          principalAmount,
 
         paymentDate:
           repaymentForm.paymentDate,
 
         reference:
-          repaymentForm.notes.trim(),
+          repaymentForm.reference.trim(),
 
       })
 
 
-      /* ================================
-         CLOSE MODAL
-      ================================= */
+      /* ===============================
+         SUCCESS
+      =============================== */
 
-      setShowRepaymentModal(false)
+      setShowRepaymentModal(
+        false
+      )
 
-      setSelectedLiability(null)
+      setSelectedLiability(
+        null
+      )
 
       setRepaymentForm({
         ...emptyRepaymentForm,
       })
 
+      setSuccessMessage(
+        `Repayment of KSh ${paymentAmount.toLocaleString()} recorded successfully.`
+      )
 
     } catch (err) {
 
       console.error(
-        "Loan repayment error:",
+        "Repayment error:",
         err
       )
 
@@ -777,6 +925,7 @@ export default function Liabilities() {
 
 
     setError("")
+    setSuccessMessage("")
 
 
     try {
@@ -800,12 +949,14 @@ export default function Liabilities() {
 
       )
 
+
+      setSuccessMessage(
+        `"${liability.name}" has been marked as cleared.`
+      )
+
     } catch (err) {
 
-      console.error(
-        "Clear liability error:",
-        err
-      )
+      console.error(err)
 
       setError(
         err.message ||
@@ -832,17 +983,35 @@ export default function Liabilities() {
 
 
       {/* =================================
+          SUCCESS
+      ================================= */}
+
+      {successMessage && (
+
+        <div className="mb-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300">
+
+          {successMessage}
+
+        </div>
+
+      )}
+
+
+      {/* =================================
           SUMMARY
       ================================= */}
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
+
 
         {/* TOTAL */}
 
         <div className="rounded-2xl bg-white p-5 shadow-sm dark:bg-slate-900">
 
           <p className="text-sm text-slate-500 dark:text-slate-400">
+
             Total Outstanding
+
           </p>
 
           <h2 className="mt-2 text-2xl font-bold text-red-600 sm:text-3xl">
@@ -861,7 +1030,9 @@ export default function Liabilities() {
         <div className="rounded-2xl bg-white p-5 shadow-sm dark:bg-slate-900">
 
           <p className="text-sm text-slate-500 dark:text-slate-400">
+
             Active Liabilities
+
           </p>
 
           <h2 className="mt-2 text-2xl font-bold sm:text-3xl">
@@ -878,7 +1049,9 @@ export default function Liabilities() {
         <div className="rounded-2xl bg-white p-5 shadow-sm dark:bg-slate-900">
 
           <p className="text-sm text-slate-500 dark:text-slate-400">
+
             Cleared
+
           </p>
 
           <h2 className="mt-2 text-2xl font-bold text-green-600 sm:text-3xl">
@@ -903,11 +1076,15 @@ export default function Liabilities() {
           <div>
 
             <h2 className="text-lg font-semibold sm:text-xl">
+
               My Liabilities
+
             </h2>
 
             <p className="text-sm text-slate-500 dark:text-slate-400">
+
               Loans and other amounts you owe.
+
             </p>
 
           </div>
@@ -918,7 +1095,9 @@ export default function Liabilities() {
             onClick={openAddModal}
             className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 sm:px-5 sm:py-3"
           >
+
             + Add Liability
+
           </button>
 
         </div>
@@ -946,7 +1125,9 @@ export default function Liabilities() {
         {loading ? (
 
           <div className="py-12 text-center text-sm text-slate-500">
+
             Loading liabilities...
+
           </div>
 
 
@@ -959,11 +1140,15 @@ export default function Liabilities() {
           <div className="mt-8 rounded-xl border border-dashed p-8 text-center dark:border-slate-700 sm:p-10">
 
             <p className="text-base font-medium sm:text-lg">
+
               No liabilities recorded yet.
+
             </p>
 
             <p className="mt-2 text-sm text-slate-500">
+
               Add a loan or debt to start tracking what you owe.
+
             </p>
 
             <button
@@ -971,7 +1156,9 @@ export default function Liabilities() {
               onClick={openAddModal}
               className="mt-5 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
             >
+
               + Add Your First Liability
+
             </button>
 
           </div>
@@ -995,6 +1182,7 @@ export default function Liabilities() {
                     0
                   )
 
+
                 const principal =
                   Number(
                     liability.principalAmount ??
@@ -1002,11 +1190,13 @@ export default function Liabilities() {
                     0
                   )
 
+
                 const paid =
                   Math.max(
                     0,
                     principal - balance
                   )
+
 
                 const progress =
                   principal > 0
@@ -1039,13 +1229,14 @@ export default function Liabilities() {
                       <div className="min-w-0">
 
                         <h3 className="font-semibold">
+
                           {liability.name}
+
                         </h3>
 
                         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
 
-                          {liability.type ||
-                            "Loan"}
+                          {liability.type || "Loan"}
 
                           {liability.lenderName
                             ? ` • ${liability.lenderName}`
@@ -1067,31 +1258,14 @@ export default function Liabilities() {
                         </p>
 
                         <p className="text-xs text-slate-500">
+
                           Outstanding
+
                         </p>
 
                       </div>
 
                     </div>
-
-
-                    {/* LINKED ACCOUNT */}
-
-                    {liability.linkedAssetName && (
-
-                      <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-
-                        Repayment account:{" "}
-
-                        <span className="font-medium text-slate-700 dark:text-slate-300">
-
-                          {liability.linkedAssetName}
-
-                        </span>
-
-                      </div>
-
-                    )}
 
 
                     {/* PROGRESS */}
@@ -1101,11 +1275,15 @@ export default function Liabilities() {
                       <div className="mb-2 flex justify-between text-xs">
 
                         <span className="text-slate-500">
+
                           Repayment Progress
+
                         </span>
 
                         <span className="font-semibold">
+
                           {progress}%
+
                         </span>
 
                       </div>
@@ -1133,7 +1311,9 @@ export default function Liabilities() {
                       <div>
 
                         <span className="text-slate-500">
+
                           Original Amount
+
                         </span>
 
                         <p className="font-medium">
@@ -1150,7 +1330,9 @@ export default function Liabilities() {
                       <div>
 
                         <span className="text-slate-500">
+
                           Interest
+
                         </span>
 
                         <p className="font-medium">
@@ -1168,7 +1350,9 @@ export default function Liabilities() {
                       <div>
 
                         <span className="text-slate-500">
+
                           Monthly Payment
+
                         </span>
 
                         <p className="font-medium">
@@ -1189,7 +1373,9 @@ export default function Liabilities() {
                       <div>
 
                         <span className="text-slate-500">
+
                           Status
+
                         </span>
 
                         <p
@@ -1209,6 +1395,23 @@ export default function Liabilities() {
                       </div>
 
                     </div>
+
+
+                    {/* LINKED ACCOUNT */}
+
+                    {liability.linkedAssetName && (
+
+                      <div className="mt-4 rounded-lg bg-blue-50 p-3 text-xs text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
+
+                        Repayment account:{" "}
+
+                        <strong>
+                          {liability.linkedAssetName}
+                        </strong>
+
+                      </div>
+
+                    )}
 
 
                     {/* LAST PAYMENT */}
@@ -1239,46 +1442,12 @@ export default function Liabilities() {
 
                           <span>
 
-                            Principal:{" "}
-
-                            <strong>
-
-                              KSh{" "}
-
-                              {Number(
-                                liability.lastPrincipalReduction ||
-                                0
-                              ).toLocaleString()}
-
-                            </strong>
-
-                          </span>
-
-
-                          <span>
-
-                            Interest:{" "}
-
-                            <strong>
-
-                              KSh{" "}
-
-                              {Number(
-                                liability.lastPaymentInterest ||
-                                0
-                              ).toLocaleString()}
-
-                            </strong>
-
-                          </span>
-
-
-                          <span>
-
                             Date:{" "}
 
                             <strong>
+
                               {liability.lastPaymentDate}
+
                             </strong>
 
                           </span>
@@ -1295,7 +1464,9 @@ export default function Liabilities() {
                     {liability.notes && (
 
                       <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+
                         {liability.notes}
+
                       </p>
 
                     )}
@@ -1316,7 +1487,9 @@ export default function Liabilities() {
                           }
                           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                         >
+
                           Make Repayment
+
                         </button>
 
 
@@ -1329,7 +1502,9 @@ export default function Liabilities() {
                           }
                           className="rounded-lg px-4 py-2 text-sm font-medium text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30"
                         >
+
                           Mark as Cleared
+
                         </button>
 
                       </div>
@@ -1365,11 +1540,15 @@ export default function Liabilities() {
               <div>
 
                 <h2 className="text-xl font-bold sm:text-2xl">
+
                   Add Liability
+
                 </h2>
 
                 <p className="text-sm text-slate-500">
+
                   Record something you owe.
+
                 </p>
 
               </div>
@@ -1380,7 +1559,9 @@ export default function Liabilities() {
                 onClick={closeAddModal}
                 className="text-2xl text-slate-400 hover:text-slate-700"
               >
+
                 ×
+
               </button>
 
             </div>
@@ -1396,7 +1577,9 @@ export default function Liabilities() {
               <div>
 
                 <label className="mb-1 block text-sm font-medium">
+
                   Liability Name
+
                 </label>
 
                 <input
@@ -1416,7 +1599,9 @@ export default function Liabilities() {
               <div>
 
                 <label className="mb-1 block text-sm font-medium">
+
                   Type
+
                 </label>
 
                 <select
@@ -1426,29 +1611,17 @@ export default function Liabilities() {
                   className="w-full rounded-xl border p-3 dark:border-slate-700 dark:bg-slate-800"
                 >
 
-                  <option value="Loan">
-                    Loan
-                  </option>
+                  <option>Loan</option>
 
-                  <option value="Credit Card">
-                    Credit Card
-                  </option>
+                  <option>Credit Card</option>
 
-                  <option value="Mortgage">
-                    Mortgage
-                  </option>
+                  <option>Mortgage</option>
 
-                  <option value="Hire Purchase">
-                    Hire Purchase
-                  </option>
+                  <option>Hire Purchase</option>
 
-                  <option value="Payable">
-                    Payable
-                  </option>
+                  <option>Payable</option>
 
-                  <option value="Other">
-                    Other
-                  </option>
+                  <option>Other</option>
 
                 </select>
 
@@ -1460,7 +1633,9 @@ export default function Liabilities() {
               <div>
 
                 <label className="mb-1 block text-sm font-medium">
+
                   Lender / Creditor
+
                 </label>
 
                 <input
@@ -1481,7 +1656,9 @@ export default function Liabilities() {
                 <div>
 
                   <label className="mb-1 block text-sm font-medium">
+
                     Original Amount
+
                   </label>
 
                   <input
@@ -1489,7 +1666,9 @@ export default function Liabilities() {
                     min="0"
                     step="0.01"
                     name="principalAmount"
-                    value={form.principalAmount}
+                    value={
+                      form.principalAmount
+                    }
                     onChange={handleChange}
                     placeholder="0"
                     className="w-full rounded-xl border p-3 dark:border-slate-700 dark:bg-slate-800"
@@ -1502,7 +1681,9 @@ export default function Liabilities() {
                 <div>
 
                   <label className="mb-1 block text-sm font-medium">
+
                     Current Balance
+
                   </label>
 
                   <input
@@ -1510,7 +1691,9 @@ export default function Liabilities() {
                     min="0"
                     step="0.01"
                     name="currentBalance"
-                    value={form.currentBalance}
+                    value={
+                      form.currentBalance
+                    }
                     onChange={handleChange}
                     placeholder="0"
                     className="w-full rounded-xl border p-3 dark:border-slate-700 dark:bg-slate-800"
@@ -1529,7 +1712,9 @@ export default function Liabilities() {
                 <div>
 
                   <label className="mb-1 block text-sm font-medium">
+
                     Interest Rate (%)
+
                   </label>
 
                   <input
@@ -1537,7 +1722,9 @@ export default function Liabilities() {
                     min="0"
                     step="0.01"
                     name="interestRate"
-                    value={form.interestRate}
+                    value={
+                      form.interestRate
+                    }
                     onChange={handleChange}
                     placeholder="0"
                     className="w-full rounded-xl border p-3 dark:border-slate-700 dark:bg-slate-800"
@@ -1549,7 +1736,9 @@ export default function Liabilities() {
                 <div>
 
                   <label className="mb-1 block text-sm font-medium">
+
                     Monthly Payment
+
                   </label>
 
                   <input
@@ -1575,14 +1764,18 @@ export default function Liabilities() {
               <div>
 
                 <label className="mb-1 block text-sm font-medium">
+
                   Term (Months)
+
                 </label>
 
                 <input
                   type="number"
                   min="0"
                   name="termMonths"
-                  value={form.termMonths}
+                  value={
+                    form.termMonths
+                  }
                   onChange={handleChange}
                   placeholder="e.g. 24"
                   className="w-full rounded-xl border p-3 dark:border-slate-700 dark:bg-slate-800"
@@ -1596,13 +1789,17 @@ export default function Liabilities() {
               <div>
 
                 <label className="mb-1 block text-sm font-medium">
+
                   Start Date
+
                 </label>
 
                 <input
                   type="date"
                   name="startDate"
-                  value={form.startDate}
+                  value={
+                    form.startDate
+                  }
                   onChange={handleChange}
                   className="w-full rounded-xl border p-3 dark:border-slate-700 dark:bg-slate-800"
                 />
@@ -1615,12 +1812,16 @@ export default function Liabilities() {
               <div>
 
                 <label className="mb-1 block text-sm font-medium">
+
                   Notes
+
                 </label>
 
                 <textarea
                   name="notes"
-                  value={form.notes}
+                  value={
+                    form.notes
+                  }
                   onChange={handleChange}
                   rows="3"
                   placeholder="Optional notes"
@@ -1639,7 +1840,9 @@ export default function Liabilities() {
                   onClick={closeAddModal}
                   className="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold"
                 >
+
                   Cancel
+
                 </button>
 
 
@@ -1677,16 +1880,22 @@ export default function Liabilities() {
 
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900 sm:p-6">
 
+            {/* HEADER */}
+
             <div className="mb-6 flex items-start justify-between gap-4">
 
               <div>
 
                 <h2 className="text-xl font-bold sm:text-2xl">
+
                   Make Repayment
+
                 </h2>
 
                 <p className="text-sm text-slate-500">
+
                   {selectedLiability.name}
+
                 </p>
 
               </div>
@@ -1697,20 +1906,22 @@ export default function Liabilities() {
                 onClick={closeRepaymentModal}
                 className="text-2xl text-slate-400 hover:text-slate-700"
               >
+
                 ×
+
               </button>
 
             </div>
 
 
-            {/* =================================
-                BALANCE
-            ================================= */}
+            {/* BALANCE */}
 
             <div className="mb-5 rounded-xl bg-slate-100 p-4 dark:bg-slate-800">
 
               <p className="text-sm text-slate-500">
+
                 Current Outstanding Balance
+
               </p>
 
               <p className="mt-1 text-2xl font-bold text-red-600">
@@ -1728,29 +1939,13 @@ export default function Liabilities() {
             </div>
 
 
-            {/* =================================
-                LINKED ACCOUNT
-            ================================= */}
+            {/* REPAYMENT ERROR */}
 
-            {selectedLiability.linkedAssetName ? (
+            {error && (
 
-              <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300">
+              <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
 
-                <p className="font-semibold">
-                  Repayment account
-                </p>
-
-                <p className="mt-1">
-                  {selectedLiability.linkedAssetName}
-                </p>
-
-              </div>
-
-            ) : (
-
-              <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
-
-                This loan has no linked asset account. A repayment cannot be processed until the loan is connected to an account.
+                {error}
 
               </div>
 
@@ -1762,12 +1957,102 @@ export default function Liabilities() {
               className="space-y-4"
             >
 
-              {/* TOTAL PAYMENT */}
+
+              {/* =================================
+                  PAYMENT ACCOUNT
+              ================================= */}
 
               <div>
 
                 <label className="mb-1 block text-sm font-medium">
+
+                  Payment Account
+
+                </label>
+
+                <select
+                  name="assetId"
+                  value={
+                    repaymentForm.assetId
+                  }
+                  onChange={
+                    handleRepaymentChange
+                  }
+                  disabled={
+                    assetsLoading ||
+                    repaying
+                  }
+                  className="w-full rounded-xl border p-3 dark:border-slate-700 dark:bg-slate-800"
+                  required
+                >
+
+                  <option value="">
+
+                    {assetsLoading
+                      ? "Loading accounts..."
+                      : assets.length === 0
+                        ? "No asset accounts available"
+                        : "Select account"}
+
+                  </option>
+
+
+                  {assets.map(
+                    (asset) => {
+
+                      const balance =
+                        Number(
+                          asset.value || 0
+                        )
+
+                      return (
+
+                        <option
+                          key={asset.id}
+                          value={asset.id}
+                        >
+
+                          {asset.name ||
+                            "Unnamed Account"}
+
+                          {" — KSh "}
+
+                          {balance.toLocaleString()}
+
+                        </option>
+
+                      )
+
+                    }
+                  )}
+
+                </select>
+
+
+                {assets.length === 0 &&
+                  !assetsLoading && (
+
+                  <p className="mt-1 text-xs text-amber-600">
+
+                    You need at least one asset/account before making a repayment.
+
+                  </p>
+
+                )}
+
+              </div>
+
+
+              {/* =================================
+                  TOTAL PAYMENT
+              ================================= */}
+
+              <div>
+
+                <label className="mb-1 block text-sm font-medium">
+
                   Total Payment
+
                 </label>
 
                 <input
@@ -1787,18 +2072,24 @@ export default function Liabilities() {
                 />
 
                 <p className="mt-1 text-xs text-slate-500">
+
                   The full amount leaving your account.
+
                 </p>
 
               </div>
 
 
-              {/* INTEREST */}
+              {/* =================================
+                  INTEREST
+              ================================= */}
 
               <div>
 
                 <label className="mb-1 block text-sm font-medium">
+
                   Interest Paid
+
                 </label>
 
                 <input
@@ -1817,18 +2108,24 @@ export default function Liabilities() {
                 />
 
                 <p className="mt-1 text-xs text-slate-500">
+
                   The remaining amount reduces the loan principal.
+
                 </p>
 
               </div>
 
 
-              {/* DATE */}
+              {/* =================================
+                  PAYMENT DATE
+              ================================= */}
 
               <div>
 
                 <label className="mb-1 block text-sm font-medium">
+
                   Payment Date
+
                 </label>
 
                 <input
@@ -1847,18 +2144,22 @@ export default function Liabilities() {
               </div>
 
 
-              {/* NOTES / REFERENCE */}
+              {/* =================================
+                  REFERENCE
+              ================================= */}
 
               <div>
 
                 <label className="mb-1 block text-sm font-medium">
+
                   Reference / Notes
+
                 </label>
 
                 <textarea
-                  name="notes"
+                  name="reference"
                   value={
-                    repaymentForm.notes
+                    repaymentForm.reference
                   }
                   onChange={
                     handleRepaymentChange
@@ -1892,8 +2193,7 @@ export default function Liabilities() {
                       KSh{" "}
 
                       {Number(
-                        repaymentForm.amount ||
-                        0
+                        repaymentForm.amount || 0
                       ).toLocaleString()}
 
                     </strong>
@@ -1912,8 +2212,7 @@ export default function Liabilities() {
                       KSh{" "}
 
                       {Number(
-                        repaymentForm.interestAmount ||
-                        0
+                        repaymentForm.interestAmount || 0
                       ).toLocaleString()}
 
                     </strong>
@@ -1934,12 +2233,45 @@ export default function Liabilities() {
                       {Math.max(
                         0,
                         Number(
-                          repaymentForm.amount ||
-                          0
+                          repaymentForm.amount || 0
                         ) -
                         Number(
-                          repaymentForm.interestAmount ||
+                          repaymentForm.interestAmount || 0
+                        )
+                      ).toLocaleString()}
+
+                    </strong>
+
+                  </div>
+
+
+                  {/* NEW BALANCE */}
+
+                  <div className="mt-2 flex justify-between gap-4">
+
+                    <span>
+                      Estimated New Balance
+                    </span>
+
+                    <strong className="text-blue-600">
+
+                      KSh{" "}
+
+                      {Math.max(
+                        0,
+                        Number(
+                          selectedLiability.currentBalance ??
+                          selectedLiability.outstandingBalance ??
                           0
+                        ) -
+                        Math.max(
+                          0,
+                          Number(
+                            repaymentForm.amount || 0
+                          ) -
+                          Number(
+                            repaymentForm.interestAmount || 0
+                          )
                         )
                       ).toLocaleString()}
 
@@ -1964,9 +2296,11 @@ export default function Liabilities() {
                     closeRepaymentModal
                   }
                   disabled={repaying}
-                  className="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold disabled:opacity-50"
+                  className="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                 >
+
                   Cancel
+
                 </button>
 
 
@@ -1974,7 +2308,8 @@ export default function Liabilities() {
                   type="submit"
                   disabled={
                     repaying ||
-                    !selectedLiability.linkedAssetId
+                    assetsLoading ||
+                    assets.length === 0
                   }
                   className="flex-1 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
                 >
